@@ -1,0 +1,23 @@
+stages:
+  - fetch
+  - train
+
+fetch_job:
+  stage: fetch
+  image: python:3.9
+  before_script:
+    - pip install -r requirements.txt
+  script:
+    - python src/feature_pipeline2.py
+  only:
+    - schedules
+
+train_job:
+  stage: train
+  image: python:3.9
+  before_script:
+    - pip install -r requirements.txt
+  script:
+    - python src/train_pipeline.py
+  only:
+    - schedules
