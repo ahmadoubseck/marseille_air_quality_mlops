@@ -13,7 +13,6 @@ prediction = model.predict(X)
 st.write("Prédiction AQI actuelle : ", prediction[0])
 st.write(df)
 """
-
 import streamlit as st
 import pandas as pd
 import joblib
@@ -69,6 +68,7 @@ if not df.empty and "aqi" in df.columns and "timestamp" in df.columns:
         prediction_historical = model.predict(X_historical)
         st.write("---")
         st.markdown(f"### 📈 Prédiction AQI basée sur les données historiques :")
+        # Suppression de la ligne st.write("Prédiction AQI actuelle : ", prediction[0]) redondante
         st.markdown(f"<h1 style='text-align: center; color: #4CAF50;'>{prediction_historical[0]:.2f}</h1>", unsafe_allow_html=True)
         st.write("Cet indice représente la qualité de l'air pour la période la plus récente dans les données historiques.")
         st.write("---")
@@ -79,6 +79,7 @@ else:
 
 st.subheader("Visualisation des Données Historiques")
 st.dataframe(df) # Utilisation de st.dataframe pour un affichage interactif
+# Suppression de la ligne st.write(df) redondante
 
 # --- Amélioration du front : Section de prédiction interactive ---
 st.markdown("---") # Séparateur visuel
@@ -133,3 +134,4 @@ if st.button("🚀 Faire la prédiction simulée"):
 st.markdown("---")
 st.markdown("🌐 Application développée pour l'analyse de la qualité de l'air à Marseille.")
 st.markdown("Pour toute question, contactez le support.")
+
