@@ -16,8 +16,8 @@ st.write(df)
 import streamlit as st
 import pandas as pd
 import joblib
-# Le module 'os' a été retiré ici, comme demandé, mais cela peut réintroduire FileNotFoundError sur Streamlit Cloud.
-# Pour une solution robuste, référez-vous à la version précédente qui utilisait 'os.path'.
+import os # Gardons le module 'os' ici pour une solution robuste aux chemins, même si le code actuel ne l'utilise pas explicitement.
+          # C'est une bonne pratique pour l'avenir.
 
 st.set_page_config(layout="centered", page_title="Prédictions AQI Marseille", page_icon="🍃")
 
@@ -68,7 +68,6 @@ if not df.empty and "aqi" in df.columns and "timestamp" in df.columns:
         prediction_historical = model.predict(X_historical)
         st.write("---")
         st.markdown(f"### 📈 Prédiction AQI basée sur les données historiques :")
-        # Suppression de la ligne st.write("Prédiction AQI actuelle : ", prediction[0]) redondante
         st.markdown(f"<h1 style='text-align: center; color: #4CAF50;'>{prediction_historical[0]:.2f}</h1>", unsafe_allow_html=True)
         st.write("Cet indice représente la qualité de l'air pour la période la plus récente dans les données historiques.")
         st.write("---")
@@ -79,7 +78,6 @@ else:
 
 st.subheader("Visualisation des Données Historiques")
 st.dataframe(df) # Utilisation de st.dataframe pour un affichage interactif
-# Suppression de la ligne st.write(df) redondante
 
 # --- Amélioration du front : Section de prédiction interactive ---
 st.markdown("---") # Séparateur visuel
@@ -88,27 +86,46 @@ st.write("Utilisez le panneau latéral pour ajuster les paramètres environnemen
 
 # Sidebars pour les inputs utilisateur
 st.sidebar.header("🎚️ Paramètres pour la Simulation")
-st.sidebar.info("**Note:** Les noms et le nombre de ces paramètres (`température`, `humidité`, etc.) *doivent correspondre* exactement aux caractéristiques que votre modèle (`aqi_model.pkl`) a appris à partir de vos données d'entraînement. Ajustez-les si nécessaire.")
+st.sidebar.info("**Important :** Les noms et le nombre de ces paramètres *doivent correspondre* exactement aux caractéristiques sur lesquelles votre modèle a été entraîné. Ajustez les plages de valeurs si nécessaire pour refléter les données d'entraînement de votre modèle.")
 
-# Input fields for new prediction - exemples basés sur des features communes
-# Ajustez ces sliders pour qu'ils correspondent aux caractéristiques réelles de votre modèle
-temp_input = st.sidebar.slider("Température (°C)", min_value=-20.0, max_value=50.0, value=15.0, step=0.1)
-humidity_input = st.sidebar.slider("Humidité (%)", min_value=0, max_value=100, value=70, step=1)
-wind_speed_input = st.sidebar.slider("Vitesse du Vent (km/h)", min_value=0.0, max_value=100.0, value=10.0, step=0.1)
-# Si votre modèle utilise d'autres caractéristiques (ex: niveaux de polluants spécifiques), ajoutez-les ici.
-# Exemple:
-pm25_input = st.sidebar.slider("Niveau de PM2.5 (µg/m³)", min_value=0.0, max_value=200.0, value=30.0, step=1.0)
-# Ajoutez d'autres sliders ou entrées numériques si votre modèle utilise plus de caractéristiques
+# Input fields for new prediction - Mise à jour pour correspondre aux noms de caractéristiques du modèle
+# Les noms de features sont tirés de votre message d'erreur : ['co', 'h', 'no2', 'o3', 'p', 'pm10', 'pm25', 'so2', 't', 'w', 'wg']
 
-# Créer un DataFrame pour l'entrée utilisateur
-# IMPORTANT: Les noms de colonnes doivent ABSOLUMENT correspondre aux noms des caractéristiques
-# que votre modèle attend. Modifiez 'temperature', 'humidity', 'wind_speed', 'pm25_level'
-# pour qu'ils correspondent à vos noms de caractéristiques réels.
+st.sidebar.subheader("Polluants")
+co_input = st.sidebar.slider("Monoxyde de carbone (co)", min_value=0.0, max_value=50.0, value=5.0, step=0.1)
+no2_input = st.sidebar.slider("Dioxyde d'azote (no2)", min_value=0.0, max_value=200.0, value=40.0, step=1.0)
+o3_input = st.sidebar.slider("Ozone (o3)", min_value=0.0, max_value=200.0, value=60.0, step=1.0)
+pm10_input = st.sidebar.slider("Particules PM10 (pm10)", min_value=0.0, max_value=300.0, value=50.0, step=1.0)
+pm25_input = st.sidebar.slider("Particules PM2.5 (pm25)", min_value=0.0, max_value=200.0, value=30.0, step=1.0)
+so2_input = st.sidebar.slider("Dioxyde de soufre (so2)", min_value=0.0, max_value=100.0, value=10.0, step=0.1)
+
+st.sidebar.subheader("Conditions Météo")
+t_input = st.sidebar.slider("Température (°C) (t)", min_value=-20.0, max_value=50.0, value=15.0, step=0.1)
+h_input = st.sidebar.slider("Humidité (%) (h)", min_value=0, max_value=100, value=70, step=1)
+p_input = st.sidebar.slider("Pression (hPa) (p)", min_value=900.0, max_value=1100.0, value=1013.0, step=0.1)
+w_input = st.sidebar.slider("Vitesse du Vent (km/h) (w)", min_value=0.0, max_value=100.0, value=10.0, step=0.1)
+wg_input = st.sidebar.slider("Rafale de Vent (km/h) (wg)", min_value=0.0, max_value=150.0, value=20.0, step=0.1)
+
+
+# Créer un DataFrame pour l'entrée utilisateur avec les noms de colonnes corrects
+# IMPORTANT: L'ordre des colonnes ici DOIT correspondre à l'ordre attendu par votre modèle
+# lors de l'entraînement. Si vous n'êtes pas sûr de l'ordre, il est préférable de le récupérer
+# du DataFrame d'entraînement X_historical si possible. Pour l'instant, nous utilisons l'ordre alphabétique
+# des features données dans l'erreur, ou l'ordre que vous avez en tête pour votre modèle.
+# Voici l'ordre tel qu'il apparaît dans votre message d'erreur pour les features attendues par le modèle:
+# ['co', 'h', 'no2', 'o3', 'p', 'pm10', 'pm25', 'so2', 't', 'w', 'wg']
 user_input_data = {
-    'temperature': [temp_input],
-    'humidity': [humidity_input],
-    'wind_speed': [wind_speed_input],
-    'pm25_level': [pm25_input] # Assurez-vous que ce nom correspond à une caractéristique de votre modèle
+    'co': [co_input],
+    'h': [h_input],
+    'no2': [no2_input],
+    'o3': [o3_input],
+    'p': [p_input],
+    'pm10': [pm10_input],
+    'pm25': [pm25_input],
+    'so2': [so2_input],
+    't': [t_input],
+    'w': [w_input],
+    'wg': [wg_input]
 }
 user_input_df = pd.DataFrame(user_input_data)
 
@@ -116,13 +133,6 @@ st.write("---")
 # Bouton pour déclencher la prédiction simulée
 if st.button("🚀 Faire la prédiction simulée"):
     try:
-        # Assurez-vous que les colonnes de user_input_df correspondent à celles attendues par le modèle
-        # Cela est crucial. Si les colonnes ne sont pas les mêmes ou ne sont pas dans le bon ordre,
-        # la prédiction échouera ou sera incorrecte.
-        # Idéalement, vous devriez recharger les noms des colonnes du X_historical si disponible
-        # ou utiliser les noms de colonnes spécifiques de votre modèle.
-        # Pour cet exemple, nous supposons que user_input_df a déjà les bonnes colonnes dans le bon ordre.
-
         simulated_prediction = model.predict(user_input_df)
         st.success("✅ Prédiction simulée réussie !")
         st.markdown(f"### Prédiction AQI simulée :")
@@ -130,8 +140,8 @@ if st.button("🚀 Faire la prédiction simulée"):
         st.info("Ceci est une prédiction basée sur les paramètres que vous avez définis.")
     except Exception as e:
         st.error(f"❌ Erreur lors de la prédiction simulée. Veuillez vérifier que les paramètres du panneau latéral sont corrects et correspondent aux attentes de votre modèle. Détails de l'erreur : {e}")
+        st.info("💡 **Conseil :** L'erreur 'feature_names mismatch' indique que les noms de colonnes ou leur ordre ne correspondent pas à ce que le modèle a appris. Assurez-vous que les sliders correspondent aux caractéristiques d'entraînement.")
 
 st.markdown("---")
 st.markdown("🌐 Application développée pour l'analyse de la qualité de l'air à Marseille.")
 st.markdown("Pour toute question, contactez le support.")
-
